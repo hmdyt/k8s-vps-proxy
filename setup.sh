@@ -41,6 +41,17 @@ fi
 log_info "Domain: $DOMAIN"
 log_info "Token: ${TOKEN:0:8}..."
 
+# Kill any process using port 80/443
+log_info "Checking and killing processes on ports 80 and 443..."
+for port in 80 443; do
+    PIDs=$(lsof -ti :$port 2>/dev/null || true)
+    if [ -n "$PIDs" ]; then
+        log_info "Killing processes on port $port: $PIDs"
+        echo "$PIDs" | xargs kill -9 2>/dev/null || true
+    fi
+done
+log_success "Ports 80 and 443 are now available"
+
 # Variables
 FRP_VERSION="0.65.0"
 INSTALL_DIR="/etc/frp"
