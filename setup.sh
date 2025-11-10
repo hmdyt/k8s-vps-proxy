@@ -1,22 +1,22 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 # ================================
 # K8s VPS Proxy Setup Script
 # ================================
 
-# Color definitions
+# Color definitions (POSIX compatible)
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Helper functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+# Helper functions (POSIX compatible)
+log_info() { printf "${BLUE}[INFO]${NC} %s\n" "$1"; }
+log_success() { printf "${GREEN}[SUCCESS]${NC} %s\n" "$1"; }
+log_warning() { printf "${YELLOW}[WARNING]${NC} %s\n" "$1"; }
+log_error() { printf "${RED}[ERROR]${NC} %s\n" "$1"; exit 1; }
 
 # Banner
 echo ""
@@ -27,7 +27,7 @@ echo "========================================="
 echo ""
 
 # Check if running as root
-if [ "$EUID" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
     log_error "Please run as root or with sudo"
 fi
 
@@ -97,17 +97,12 @@ curl -sSL -o configs/Caddyfile.template "$GITHUB_REPO/configs/Caddyfile.template
 # Step 5: Generate WireGuard keys
 log_info "Generating WireGuard keys..."
 
-# Check if wg command exists, if not use docker
-if command -v wg &> /dev/null; then
-    VPS_PRIVATE_KEY=$(wg genkey)
-    VPS_PUBLIC_KEY=$(echo $VPS_PRIVATE_KEY | wg pubkey)
-else
-    # Use docker to generate keys
-    docker run --rm -i --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey
-    docker run --rm -i --entrypoint sh linuxserver/wireguard:latest -c "cat | wg pubkey" < wireguard/privatekey > wireguard/publickey
-    VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
-    VPS_PUBLIC_KEY=$(cat wireguard/publickey)
-fi
+# Always use docker to generate keys for consistency
+log_info "Using Docker to generate WireGuard keys..."
+docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey 2>/dev/null
+VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
+VPS_PUBLIC_KEY=$(docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "cat | wg pubkey" < wireguard/privatekey 2>/dev/null)
+echo "$VPS_PUBLIC_KEY" > wireguard/publickey
 
 # Save keys securely
 echo "$VPS_PRIVATE_KEY" > wireguard/privatekey
@@ -218,23 +213,23 @@ echo "========================================="
 log_success "VPS Setup Complete!"
 echo "========================================="
 echo ""
-echo -e "${GREEN}VPS Configuration:${NC}"
+printf "${GREEN}VPS Configuration:${NC}\n"
 echo "  Domain: $DOMAIN"
 echo "  Public IP: $VPS_IP"
 echo "  WireGuard Port: $WG_PORT"
 echo "  WireGuard IP: ${VPS_WG_IP}/24"
 echo ""
-echo -e "${GREEN}VPS WireGuard Public Key:${NC}"
+printf "${GREEN}VPS WireGuard Public Key:${NC}\n"
 echo "  $VPS_PUBLIC_KEY"
 echo ""
 echo "========================================="
 echo ""
-echo -e "${YELLOW}Next Steps:${NC}"
+printf "${YELLOW}Next Steps:${NC}\n"
 echo ""
 echo "1. Configure DNS:"
 echo "   Add these DNS records to your domain:"
-echo "   ${BLUE}A    *.${DOMAIN}    →  ${VPS_IP}${NC}"
-echo "   ${BLUE}A    ${DOMAIN}       →  ${VPS_IP}${NC}"
+printf "   ${BLUE}A    *.${DOMAIN}    →  ${VPS_IP}${NC}\n"
+printf "   ${BLUE}A    ${DOMAIN}       →  ${VPS_IP}${NC}\n"
 echo ""
 echo "2. Setup K8s WireGuard client with this configuration:"
 echo ""
@@ -249,13 +244,13 @@ echo "   AllowedIPs = ${VPS_WG_IP}/32"
 echo "   PersistentKeepalive = 25"
 echo ""
 echo "3. After K8s setup, add K8s peer to VPS:"
-echo "   ${BLUE}cd ${INSTALL_DIR}${NC}"
-echo "   ${BLUE}# Edit wireguard/wg0.conf and add [Peer] section${NC}"
-echo "   ${BLUE}docker-compose restart wireguard${NC}"
+printf "   ${BLUE}cd ${INSTALL_DIR}${NC}\n"
+printf "   ${BLUE}# Edit wireguard/wg0.conf and add [Peer] section${NC}\n"
+printf "   ${BLUE}docker-compose restart wireguard${NC}\n"
 echo ""
 echo "========================================="
 echo ""
-echo -e "${GREEN}Useful Commands:${NC}"
+printf "${GREEN}Useful Commands:${NC}\n"
 echo "  cd ${INSTALL_DIR}"
 echo "  docker-compose logs -f        # View logs"
 echo "  docker exec wireguard wg show # Check WireGuard status"
