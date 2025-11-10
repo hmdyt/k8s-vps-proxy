@@ -1,0 +1,12 @@
+[Interface]
+Address = ${VPS_WG_IP}/24
+ListenPort = ${WG_PORT}
+PrivateKey = ${VPS_PRIVATE_KEY}
+PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+# Add K8s peer configuration here after setup
+# Example:
+# [Peer]
+# PublicKey = K8S_PUBLIC_KEY
+# AllowedIPs = ${K8S_WG_IP}/32

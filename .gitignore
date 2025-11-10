@@ -1,0 +1,43 @@
+# Environment files
+.env
+
+# WireGuard keys and configs (NEVER commit these!)
+wireguard/
+*.key
+*.conf
+!configs/*.template
+!configs/wg0.conf.template
+
+# Caddy data
+caddy_data/
+caddy_config/
+caddy/Caddyfile
+!configs/Caddyfile.template
+
+# Setup information
+setup-info.txt
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backup files
+*.bak
+*.backup
+
+# Docker volumes
+volumes/
+
+# Temporary files
+*.tmp
+.tmp/

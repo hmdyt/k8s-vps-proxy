@@ -1,0 +1,24 @@
+# Global options
+{
+    email admin@${DOMAIN}
+}
+
+# Wildcard subdomain routing to K8s Ingress
+*.${DOMAIN} {
+    reverse_proxy http://${K8S_WG_IP}:80 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# Root domain routing
+${DOMAIN} {
+    reverse_proxy http://${K8S_WG_IP}:80 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
