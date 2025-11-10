@@ -162,6 +162,7 @@ if command -v ufw >/dev/null 2>&1; then
     ufw allow 443/tcp
     ufw allow 7000/tcp
     ufw allow 7500/tcp
+    ufw reload
     log_success "Firewall configured"
 fi
 
