@@ -44,9 +44,16 @@ if ! command -v docker >/dev/null 2>&1; then
     log_info "Installing Docker via snap..."
     snap install docker
     log_success "Docker installed"
+    # For snap Docker, we might need to use snap run docker
+    if [ -x "/snap/bin/docker" ]; then
+        alias docker="/snap/bin/docker"
+    fi
 else
     log_success "Docker already installed"
 fi
+
+# Verify Docker is working
+docker version >/dev/null 2>&1 || log_error "Docker is not working properly"
 
 # Step 2: Get domain name from environment variable
 if [ -z "$DOMAIN" ] || [ "$DOMAIN" = "" ]; then
@@ -82,9 +89,19 @@ curl -sSL -o configs/Caddyfile.template "$GITHUB_REPO/configs/Caddyfile.template
 
 # Step 5: Generate WireGuard keys
 log_info "Generating WireGuard keys..."
-docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey 2>/dev/null
+
+# Pull WireGuard image first if needed
+log_info "Pulling WireGuard Docker image..."
+docker pull linuxserver/wireguard:latest || log_error "Failed to pull WireGuard Docker image"
+
+# Generate private key
+docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey || log_error "Failed to generate private key"
 VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
-VPS_PUBLIC_KEY=$(docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "cat | wg pubkey" < wireguard/privatekey 2>/dev/null)
+
+# Generate public key
+VPS_PUBLIC_KEY=$(docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "cat | wg pubkey" < wireguard/privatekey) || log_error "Failed to generate public key"
+
+# Save keys
 echo "$VPS_PUBLIC_KEY" > wireguard/publickey
 chmod 600 wireguard/privatekey
 
