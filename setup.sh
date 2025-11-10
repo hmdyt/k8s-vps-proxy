@@ -38,6 +38,10 @@ VPS_WG_IP="10.0.0.1"
 K8S_WG_IP="10.0.0.2"
 WG_PORT="51820"
 
+# Initialize optional environment variables
+VPS_IP="${VPS_IP:-}"
+DOMAIN="${DOMAIN:-}"
+
 # Step 1: Install Docker if needed (using snap for simplicity)
 log_info "Checking Docker installation..."
 if ! command -v docker >/dev/null 2>&1; then
