@@ -171,18 +171,8 @@ cat > caddy/Caddyfile <<EOF
     email admin@${DOMAIN}
 }
 
-# Wildcard subdomain routing
+# Wildcard subdomain routing to K8s Ingress
 *.${DOMAIN} {
-    reverse_proxy http://${K8S_WG_IP}:80 {
-        header_up Host {host}
-        header_up X-Real-IP {remote}
-        header_up X-Forwarded-For {remote}
-        header_up X-Forwarded-Proto {scheme}
-    }
-}
-
-# Root domain
-${DOMAIN} {
     reverse_proxy http://${K8S_WG_IP}:80 {
         header_up Host {host}
         header_up X-Real-IP {remote}
@@ -231,9 +221,8 @@ echo ""
 printf "${YELLOW}Next Steps:${NC}\n"
 echo ""
 echo "1. Configure DNS:"
-echo "   Add these DNS records to your domain:"
+echo "   Add this DNS record to your domain:"
 printf "   ${BLUE}A    *.${DOMAIN}    →  ${VPS_IP}${NC}\n"
-printf "   ${BLUE}A    ${DOMAIN}       →  ${VPS_IP}${NC}\n"
 echo ""
 echo "2. Setup K8s WireGuard client with this configuration:"
 echo ""
