@@ -5,18 +5,6 @@ set -e
 # K8s VPS Proxy Setup Script
 # ================================
 
-# Check if we're running from a pipe and re-execute if needed
-if [ ! -t 0 ]; then
-    # Save script to temp file and re-execute
-    TEMP_SCRIPT="/tmp/k8s-vps-proxy-setup-$$.sh"
-    cat > "$TEMP_SCRIPT"
-    chmod +x "$TEMP_SCRIPT"
-    # Clean up temp file after execution
-    trap "rm -f $TEMP_SCRIPT" EXIT
-    bash "$TEMP_SCRIPT"
-    exit $?
-fi
-
 # Color definitions (POSIX compatible)
 RED='\033[0;31m'
 GREEN='\033[0;32m'
