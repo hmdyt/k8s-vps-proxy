@@ -224,21 +224,34 @@ echo "1. Configure DNS:"
 echo "   Add this DNS record to your domain:"
 printf "   ${BLUE}A    *.${DOMAIN}    →  ${VPS_IP}${NC}\n"
 echo ""
-echo "2. Setup K8s WireGuard client with this configuration:"
+echo "2. Setup K8s WireGuard client:"
 echo ""
-echo "   [Interface]"
-echo "   Address = ${K8S_WG_IP}/24"
-echo "   PrivateKey = <YOUR_K8S_PRIVATE_KEY>"
+printf "${GREEN}K8s WireGuard Configuration (wg0.conf):${NC}\n"
+echo "========================================="
+cat <<WGCONFIG
+[Interface]
+Address = ${K8S_WG_IP}/24
+PrivateKey = <YOUR_K8S_PRIVATE_KEY>
+ListenPort = ${WG_PORT}
+
+[Peer]
+PublicKey = ${VPS_PUBLIC_KEY}
+Endpoint = ${VPS_IP}:${WG_PORT}
+AllowedIPs = ${VPS_WG_IP}/32
+PersistentKeepalive = 25
+WGCONFIG
+echo "========================================="
 echo ""
-echo "   [Peer]"
-echo "   PublicKey = ${VPS_PUBLIC_KEY}"
-echo "   Endpoint = ${VPS_IP}:${WG_PORT}"
-echo "   AllowedIPs = ${VPS_WG_IP}/32"
-echo "   PersistentKeepalive = 25"
+printf "${YELLOW}Note:${NC} Generate K8s private key with:\n"
+printf "  ${BLUE}docker run --rm linuxserver/wireguard:latest wg genkey${NC}\n"
 echo ""
 echo "3. After K8s setup, add K8s peer to VPS:"
 printf "   ${BLUE}cd ${INSTALL_DIR}${NC}\n"
-printf "   ${BLUE}# Edit wireguard/wg0.conf and add [Peer] section${NC}\n"
+printf "   ${BLUE}# Edit wireguard/wg0.conf and add [Peer] section:${NC}\n"
+echo "   [Peer]"
+echo "   PublicKey = <K8S_PUBLIC_KEY>"
+echo "   AllowedIPs = ${K8S_WG_IP}/32"
+echo ""
 printf "   ${BLUE}docker-compose restart wireguard${NC}\n"
 echo ""
 echo "========================================="
@@ -266,6 +279,24 @@ ${VPS_PUBLIC_KEY}
 Installation Directory: ${INSTALL_DIR}
 EOF
 
+# Save K8s WireGuard config template
+cat > k8s-wg0.conf <<EOF
+[Interface]
+Address = ${K8S_WG_IP}/24
+PrivateKey = <YOUR_K8S_PRIVATE_KEY>
+ListenPort = ${WG_PORT}
+
+[Peer]
+PublicKey = ${VPS_PUBLIC_KEY}
+Endpoint = ${VPS_IP}:${WG_PORT}
+AllowedIPs = ${VPS_WG_IP}/32
+PersistentKeepalive = 25
+EOF
+
 log_success "Setup information saved to ${INSTALL_DIR}/setup-info.txt"
+log_success "K8s WireGuard config saved to ${INSTALL_DIR}/k8s-wg0.conf"
+echo ""
+printf "${GREEN}To use the K8s config:${NC}\n"
+printf "  ${BLUE}cat ${INSTALL_DIR}/k8s-wg0.conf${NC}\n"
 echo ""
 echo "Installation completed successfully!"
