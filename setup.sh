@@ -65,51 +65,120 @@ log_info "Creating installation directory..."
 mkdir -p $INSTALL_DIR
 cd $INSTALL_DIR
 
-# Step 3: Get domain name from user
-echo ""
-read -p "Enter your domain name (e.g., example.com): " DOMAIN
-if [ -z "$DOMAIN" ]; then
-    log_error "Domain name is required"
+# Check for existing installation
+if [ -f ".env" ]; then
+    log_info "Existing installation found at $INSTALL_DIR"
+    printf "${YELLOW}Do you want to update the existing installation? (y/N): ${NC}"
+    read UPDATE_CHOICE
+    if [ "$UPDATE_CHOICE" != "y" ] && [ "$UPDATE_CHOICE" != "Y" ]; then
+        log_info "Keeping existing configuration. Exiting."
+        exit 0
+    fi
+    # Load existing configuration
+    . ./.env
+    log_info "Loaded existing configuration for domain: $DOMAIN"
+
+    # Backup existing configs
+    BACKUP_DIR="backup-$(date +%Y%m%d-%H%M%S)"
+    log_info "Creating backup in $BACKUP_DIR"
+    mkdir -p $BACKUP_DIR
+    [ -f ".env" ] && cp .env $BACKUP_DIR/
+    [ -f "wireguard/wg0.conf" ] && cp wireguard/wg0.conf $BACKUP_DIR/
+    [ -f "caddy/Caddyfile" ] && cp caddy/Caddyfile $BACKUP_DIR/
+    [ -f "wireguard/privatekey" ] && cp wireguard/privatekey $BACKUP_DIR/
+    [ -f "wireguard/publickey" ] && cp wireguard/publickey $BACKUP_DIR/
 fi
 
-log_info "Using domain: $DOMAIN"
+# Step 3: Get domain name from user (if not already set)
+if [ -z "$DOMAIN" ]; then
+    echo ""
+    read -p "Enter your domain name (e.g., example.com): " DOMAIN
+    if [ -z "$DOMAIN" ]; then
+        log_error "Domain name is required"
+    fi
+    log_info "Using domain: $DOMAIN"
+else
+    log_info "Using existing domain: $DOMAIN"
+    printf "${YELLOW}Do you want to change the domain? (y/N): ${NC}"
+    read CHANGE_DOMAIN
+    if [ "$CHANGE_DOMAIN" = "y" ] || [ "$CHANGE_DOMAIN" = "Y" ]; then
+        read -p "Enter new domain name: " NEW_DOMAIN
+        if [ -n "$NEW_DOMAIN" ]; then
+            DOMAIN=$NEW_DOMAIN
+            log_info "Updated domain to: $DOMAIN"
+        fi
+    fi
+fi
 
-# Step 4: Download configuration files
-log_info "Downloading configuration files..."
-
-# Download docker-compose.yml
-curl -sSL -o docker-compose.yml "$GITHUB_REPO/docker-compose.yml" || {
-    log_error "Failed to download docker-compose.yml"
-}
-
+# Step 4: Download or update configuration files
 # Create configs directory
 mkdir -p configs wireguard caddy
 
-# Download config templates
-curl -sSL -o configs/wg0.conf.template "$GITHUB_REPO/configs/wg0.conf.template" || {
-    log_error "Failed to download wg0.conf.template"
-}
+if [ -f "docker-compose.yml" ]; then
+    log_info "Configuration files already exist"
+    printf "${YELLOW}Do you want to update configuration templates? (y/N): ${NC}"
+    read UPDATE_CONFIGS
+    if [ "$UPDATE_CONFIGS" = "y" ] || [ "$UPDATE_CONFIGS" = "Y" ]; then
+        log_info "Downloading latest configuration files..."
 
-curl -sSL -o configs/Caddyfile.template "$GITHUB_REPO/configs/Caddyfile.template" || {
-    log_error "Failed to download Caddyfile.template"
-}
+        # Download docker-compose.yml
+        curl -sSL -o docker-compose.yml "$GITHUB_REPO/docker-compose.yml" || {
+            log_error "Failed to download docker-compose.yml"
+        }
 
-# Step 5: Generate WireGuard keys
-log_info "Generating WireGuard keys..."
+        # Download config templates
+        curl -sSL -o configs/wg0.conf.template "$GITHUB_REPO/configs/wg0.conf.template" || {
+            log_error "Failed to download wg0.conf.template"
+        }
 
-# Always use docker to generate keys for consistency
-log_info "Using Docker to generate WireGuard keys..."
-docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey 2>/dev/null
-VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
-VPS_PUBLIC_KEY=$(docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "cat | wg pubkey" < wireguard/privatekey 2>/dev/null)
-echo "$VPS_PUBLIC_KEY" > wireguard/publickey
+        curl -sSL -o configs/Caddyfile.template "$GITHUB_REPO/configs/Caddyfile.template" || {
+            log_error "Failed to download Caddyfile.template"
+        }
 
-# Save keys securely
-echo "$VPS_PRIVATE_KEY" > wireguard/privatekey
-echo "$VPS_PUBLIC_KEY" > wireguard/publickey
-chmod 600 wireguard/privatekey
+        log_success "Configuration templates updated"
+    else
+        log_info "Using existing configuration templates"
+    fi
+else
+    log_info "Downloading configuration files..."
 
-log_success "WireGuard keys generated"
+    # Download docker-compose.yml
+    curl -sSL -o docker-compose.yml "$GITHUB_REPO/docker-compose.yml" || {
+        log_error "Failed to download docker-compose.yml"
+    }
+
+    # Download config templates
+    curl -sSL -o configs/wg0.conf.template "$GITHUB_REPO/configs/wg0.conf.template" || {
+        log_error "Failed to download wg0.conf.template"
+    }
+
+    curl -sSL -o configs/Caddyfile.template "$GITHUB_REPO/configs/Caddyfile.template" || {
+        log_error "Failed to download Caddyfile.template"
+    }
+
+    log_success "Configuration files downloaded"
+fi
+
+# Step 5: Generate or load WireGuard keys
+if [ -f "wireguard/privatekey" ] && [ -f "wireguard/publickey" ]; then
+    log_info "Using existing WireGuard keys"
+    VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
+    VPS_PUBLIC_KEY=$(cat wireguard/publickey)
+    log_success "Loaded existing WireGuard keys"
+else
+    log_info "Generating new WireGuard keys..."
+
+    # Use docker to generate keys for consistency
+    log_info "Using Docker to generate WireGuard keys..."
+    docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey 2>/dev/null
+    VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
+    VPS_PUBLIC_KEY=$(docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "cat | wg pubkey" < wireguard/privatekey 2>/dev/null)
+    echo "$VPS_PUBLIC_KEY" > wireguard/publickey
+
+    # Save keys securely
+    chmod 600 wireguard/privatekey
+    log_success "WireGuard keys generated"
+fi
 
 # Step 6: Get VPS public IP
 log_info "Detecting VPS public IP..."
@@ -193,18 +262,35 @@ if command -v ufw &> /dev/null; then
     log_success "Firewall configured"
 fi
 
-# Step 10: Start services with Docker Compose
-log_info "Starting services..."
-docker compose up -d || docker-compose up -d
+# Step 10: Start or restart services with Docker Compose
+# Check if services are already running
+SERVICE_STATUS=$(docker compose ps 2>/dev/null || docker-compose ps 2>/dev/null)
 
-# Wait for services to start
-sleep 5
-
-# Check if services are running
-if docker compose ps | grep -q "Up" || docker-compose ps | grep -q "Up"; then
-    log_success "Services started successfully"
+if echo "$SERVICE_STATUS" | grep -q "Up"; then
+    log_info "Services are already running"
+    printf "${YELLOW}Do you want to restart the services? (y/N): ${NC}"
+    read RESTART_CHOICE
+    if [ "$RESTART_CHOICE" = "y" ] || [ "$RESTART_CHOICE" = "Y" ]; then
+        log_info "Restarting services..."
+        docker compose restart || docker-compose restart
+        sleep 5
+        log_success "Services restarted"
+    else
+        log_info "Services kept running without restart"
+    fi
 else
-    log_error "Failed to start services. Check logs with: docker-compose logs"
+    log_info "Starting services..."
+    docker compose up -d || docker-compose up -d
+
+    # Wait for services to start
+    sleep 5
+
+    # Check if services are running
+    if docker compose ps | grep -q "Up" || docker-compose ps | grep -q "Up"; then
+        log_success "Services started successfully"
+    else
+        log_error "Failed to start services. Check logs with: docker-compose logs"
+    fi
 fi
 
 # Step 11: Display setup information
