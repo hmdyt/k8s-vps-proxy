@@ -90,17 +90,9 @@ curl -sSL -o configs/Caddyfile.template "$GITHUB_REPO/configs/Caddyfile.template
 # Step 5: Generate WireGuard keys
 log_info "Generating WireGuard keys..."
 
-# Pull WireGuard image first if needed
-log_info "Pulling WireGuard Docker image (this may take a moment)..."
-if ! docker pull linuxserver/wireguard:latest; then
-    log_error "Failed to pull WireGuard Docker image. Check your internet connection and Docker installation."
-fi
-
 # Generate private key
 log_info "Generating private key..."
-if ! docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey 2>/dev/null; then
-    log_error "Failed to generate private key. Docker might not be working properly."
-fi
+docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey 2>/dev/null || log_error "Failed to generate private key"
 
 if [ ! -f wireguard/privatekey ] || [ ! -s wireguard/privatekey ]; then
     log_error "Private key file is empty or doesn't exist"
@@ -109,12 +101,12 @@ fi
 VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
 log_info "Private key generated successfully"
 
-# Generate public key
+# Generate public key using echo instead of pipe
 log_info "Generating public key..."
-VPS_PUBLIC_KEY=$(docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "cat | wg pubkey" < wireguard/privatekey 2>/dev/null)
+VPS_PUBLIC_KEY=$(echo "$VPS_PRIVATE_KEY" | docker run --rm -i --entrypoint sh linuxserver/wireguard:latest -c "wg pubkey") || log_error "Failed to generate public key"
 
 if [ -z "$VPS_PUBLIC_KEY" ]; then
-    log_error "Failed to generate public key"
+    log_error "Failed to generate public key - output is empty"
 fi
 
 # Save keys
