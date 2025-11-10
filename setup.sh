@@ -38,187 +38,55 @@ VPS_WG_IP="10.0.0.1"
 K8S_WG_IP="10.0.0.2"
 WG_PORT="51820"
 
-# Step 1: Check and install Docker if needed
+# Step 1: Install Docker if needed (using snap for simplicity)
 log_info "Checking Docker installation..."
-
-# Skip Docker check if already confirmed working
-if docker version >/dev/null 2>&1; then
-    log_success "Docker is installed and running"
+if ! command -v docker >/dev/null 2>&1; then
+    log_info "Installing Docker via snap..."
+    snap install docker
+    log_success "Docker installed"
 else
-    log_warning "Docker not accessible. Checking installation..."
-
-    if [ -x "/usr/bin/docker" ] || [ -x "/usr/local/bin/docker" ] || which docker >/dev/null 2>&1; then
-        log_info "Docker binary found but not running"
-        systemctl start docker 2>/dev/null || service docker start 2>/dev/null
-        sleep 2
-
-        if ! docker version >/dev/null 2>&1; then
-            log_error "Docker installed but cannot start. Please check Docker daemon"
-        fi
-    else
-        log_warning "Docker not found. Installing Docker..."
-        printf "${YELLOW}Install Docker now? (y/N): ${NC}"
-        read INSTALL_DOCKER
-        if [ "$INSTALL_DOCKER" = "y" ] || [ "$INSTALL_DOCKER" = "Y" ]; then
-            curl -fsSL https://get.docker.com | sh
-            systemctl enable docker
-            systemctl start docker
-            log_success "Docker installed successfully"
-        else
-            log_error "Docker is required. Please install Docker manually and run this script again"
-        fi
-    fi
+    log_success "Docker already installed"
 fi
 
-# Check Docker Compose
-if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
-    log_warning "Docker Compose not found. Installing..."
-    apt-get update
-    apt-get install -y docker-compose-plugin || apt-get install -y docker-compose
-    log_success "Docker Compose installed"
-else
-    log_success "Docker Compose is already installed"
+# Step 2: Get domain name
+echo ""
+read -p "Enter your domain name (e.g., example.com): " DOMAIN
+if [ -z "$DOMAIN" ]; then
+    log_error "Domain name is required"
 fi
+log_info "Using domain: $DOMAIN"
 
-# Step 2: Create installation directory
-log_info "Creating installation directory..."
+# Step 3: Clean and create installation directory
+log_info "Setting up installation directory..."
+rm -rf $INSTALL_DIR
 mkdir -p $INSTALL_DIR
 cd $INSTALL_DIR
 
-# Check for existing installation
-EXISTING_INSTALL=0
-if [ -f ".env" ] && [ -f "docker-compose.yml" ]; then
-    EXISTING_INSTALL=1
-    log_info "Existing installation found at $INSTALL_DIR"
-
-    # Try to load existing configuration
-    . ./.env
-
-    # Check if DOMAIN is set from existing config
-    if [ -n "$DOMAIN" ]; then
-        log_info "Loaded existing configuration for domain: $DOMAIN"
-        printf "${YELLOW}Do you want to update the existing installation? (y/N): ${NC}"
-        read UPDATE_CHOICE
-
-        if [ "$UPDATE_CHOICE" != "y" ] && [ "$UPDATE_CHOICE" != "Y" ]; then
-            log_info "Keeping existing configuration. Checking services..."
-            # Don't exit, just check if services are running
-            SERVICE_STATUS=$(docker compose ps 2>/dev/null || docker-compose ps 2>/dev/null)
-            if echo "$SERVICE_STATUS" | grep -q "Up"; then
-                log_success "Services are running. Setup complete!"
-                exit 0
-            else
-                log_info "Services not running. Starting services..."
-                docker compose up -d || docker-compose up -d
-                exit 0
-            fi
-        fi
-
-        # Backup existing configs
-        BACKUP_DIR="backup-$(date +%Y%m%d-%H%M%S)"
-        log_info "Creating backup in $BACKUP_DIR"
-        mkdir -p $BACKUP_DIR
-        [ -f ".env" ] && cp .env $BACKUP_DIR/
-        [ -f "wireguard/wg0.conf" ] && cp wireguard/wg0.conf $BACKUP_DIR/
-        [ -f "caddy/Caddyfile" ] && cp caddy/Caddyfile $BACKUP_DIR/
-        [ -f "wireguard/privatekey" ] && cp wireguard/privatekey $BACKUP_DIR/
-        [ -f "wireguard/publickey" ] && cp wireguard/publickey $BACKUP_DIR/
-    else
-        log_warning "Existing .env found but DOMAIN not set. Will ask for domain."
-        EXISTING_INSTALL=0
-    fi
-fi
-
-# Step 3: Get domain name from user (if not already set)
-if [ -z "$DOMAIN" ]; then
-    echo ""
-    read -p "Enter your domain name (e.g., example.com): " DOMAIN
-    if [ -z "$DOMAIN" ]; then
-        log_error "Domain name is required"
-    fi
-    log_info "Using domain: $DOMAIN"
-else
-    log_info "Using existing domain: $DOMAIN"
-    printf "${YELLOW}Do you want to change the domain? (y/N): ${NC}"
-    read CHANGE_DOMAIN
-    if [ "$CHANGE_DOMAIN" = "y" ] || [ "$CHANGE_DOMAIN" = "Y" ]; then
-        read -p "Enter new domain name: " NEW_DOMAIN
-        if [ -n "$NEW_DOMAIN" ]; then
-            DOMAIN=$NEW_DOMAIN
-            log_info "Updated domain to: $DOMAIN"
-        fi
-    fi
-fi
-
-# Step 4: Download or update configuration files
-# Create configs directory
+# Step 4: Download configuration files
+log_info "Downloading configuration files..."
 mkdir -p configs wireguard caddy
 
-if [ -f "docker-compose.yml" ]; then
-    log_info "Configuration files already exist"
-    printf "${YELLOW}Do you want to update configuration templates? (y/N): ${NC}"
-    read UPDATE_CONFIGS
-    if [ "$UPDATE_CONFIGS" = "y" ] || [ "$UPDATE_CONFIGS" = "Y" ]; then
-        log_info "Downloading latest configuration files..."
+curl -sSL -o docker-compose.yml "$GITHUB_REPO/docker-compose.yml" || {
+    log_error "Failed to download docker-compose.yml"
+}
 
-        # Download docker-compose.yml
-        curl -sSL -o docker-compose.yml "$GITHUB_REPO/docker-compose.yml" || {
-            log_error "Failed to download docker-compose.yml"
-        }
+curl -sSL -o configs/wg0.conf.template "$GITHUB_REPO/configs/wg0.conf.template" || {
+    log_error "Failed to download wg0.conf.template"
+}
 
-        # Download config templates
-        curl -sSL -o configs/wg0.conf.template "$GITHUB_REPO/configs/wg0.conf.template" || {
-            log_error "Failed to download wg0.conf.template"
-        }
+curl -sSL -o configs/Caddyfile.template "$GITHUB_REPO/configs/Caddyfile.template" || {
+    log_error "Failed to download Caddyfile.template"
+}
 
-        curl -sSL -o configs/Caddyfile.template "$GITHUB_REPO/configs/Caddyfile.template" || {
-            log_error "Failed to download Caddyfile.template"
-        }
+# Step 5: Generate WireGuard keys
+log_info "Generating WireGuard keys..."
+docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey 2>/dev/null
+VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
+VPS_PUBLIC_KEY=$(docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "cat | wg pubkey" < wireguard/privatekey 2>/dev/null)
+echo "$VPS_PUBLIC_KEY" > wireguard/publickey
+chmod 600 wireguard/privatekey
 
-        log_success "Configuration templates updated"
-    else
-        log_info "Using existing configuration templates"
-    fi
-else
-    log_info "Downloading configuration files..."
-
-    # Download docker-compose.yml
-    curl -sSL -o docker-compose.yml "$GITHUB_REPO/docker-compose.yml" || {
-        log_error "Failed to download docker-compose.yml"
-    }
-
-    # Download config templates
-    curl -sSL -o configs/wg0.conf.template "$GITHUB_REPO/configs/wg0.conf.template" || {
-        log_error "Failed to download wg0.conf.template"
-    }
-
-    curl -sSL -o configs/Caddyfile.template "$GITHUB_REPO/configs/Caddyfile.template" || {
-        log_error "Failed to download Caddyfile.template"
-    }
-
-    log_success "Configuration files downloaded"
-fi
-
-# Step 5: Generate or load WireGuard keys
-if [ -f "wireguard/privatekey" ] && [ -f "wireguard/publickey" ]; then
-    log_info "Using existing WireGuard keys"
-    VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
-    VPS_PUBLIC_KEY=$(cat wireguard/publickey)
-    log_success "Loaded existing WireGuard keys"
-else
-    log_info "Generating new WireGuard keys..."
-
-    # Use docker to generate keys for consistency
-    log_info "Using Docker to generate WireGuard keys..."
-    docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "wg genkey" > wireguard/privatekey 2>/dev/null
-    VPS_PRIVATE_KEY=$(cat wireguard/privatekey)
-    VPS_PUBLIC_KEY=$(docker run --rm --entrypoint sh linuxserver/wireguard:latest -c "cat | wg pubkey" < wireguard/privatekey 2>/dev/null)
-    echo "$VPS_PUBLIC_KEY" > wireguard/publickey
-
-    # Save keys securely
-    chmod 600 wireguard/privatekey
-    log_success "WireGuard keys generated"
-fi
+log_success "WireGuard keys generated"
 
 # Step 6: Get VPS public IP
 log_info "Detecting VPS public IP..."
@@ -244,7 +112,7 @@ VPS_IP=$VPS_IP
 TZ=Asia/Tokyo
 EOF
 
-# Step 8: Generate actual config files from templates
+# Step 8: Generate actual config files
 log_info "Generating configuration files..."
 
 # Generate wg0.conf
@@ -291,47 +159,24 @@ ${DOMAIN} {
 }
 EOF
 
-# Step 9: Configure UFW firewall if available
-if command -v ufw &> /dev/null; then
+# Step 9: Configure firewall (if ufw exists)
+if command -v ufw >/dev/null 2>&1; then
     log_info "Configuring firewall..."
     ufw --force enable
-    ufw allow 22/tcp comment "SSH"
-    ufw allow 80/tcp comment "HTTP"
-    ufw allow 443/tcp comment "HTTPS"
-    ufw allow ${WG_PORT}/udp comment "WireGuard"
+    ufw allow 22/tcp
+    ufw allow 80/tcp
+    ufw allow 443/tcp
+    ufw allow ${WG_PORT}/udp
     log_success "Firewall configured"
 fi
 
-# Step 10: Start or restart services with Docker Compose
-# Check if services are already running
-SERVICE_STATUS=$(docker compose ps 2>/dev/null || docker-compose ps 2>/dev/null)
+# Step 10: Start services
+log_info "Starting services..."
+docker compose down 2>/dev/null || true
+docker compose up -d || docker-compose up -d
 
-if echo "$SERVICE_STATUS" | grep -q "Up"; then
-    log_info "Services are already running"
-    printf "${YELLOW}Do you want to restart the services? (y/N): ${NC}"
-    read RESTART_CHOICE
-    if [ "$RESTART_CHOICE" = "y" ] || [ "$RESTART_CHOICE" = "Y" ]; then
-        log_info "Restarting services..."
-        docker compose restart || docker-compose restart
-        sleep 5
-        log_success "Services restarted"
-    else
-        log_info "Services kept running without restart"
-    fi
-else
-    log_info "Starting services..."
-    docker compose up -d || docker-compose up -d
-
-    # Wait for services to start
-    sleep 5
-
-    # Check if services are running
-    if docker compose ps | grep -q "Up" || docker-compose ps | grep -q "Up"; then
-        log_success "Services started successfully"
-    else
-        log_error "Failed to start services. Check logs with: docker-compose logs"
-    fi
-fi
+# Wait for services
+sleep 5
 
 # Step 11: Display setup information
 echo ""
@@ -383,7 +228,7 @@ echo "  docker exec wireguard wg show # Check WireGuard status"
 echo "  docker-compose restart        # Restart services"
 echo ""
 
-# Save setup info to file
+# Save setup info
 cat > setup-info.txt <<EOF
 VPS Setup Information
 =====================
