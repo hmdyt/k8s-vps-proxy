@@ -5,6 +5,16 @@ set -e
 # K8s VPS Proxy Setup Script
 # ================================
 
+# Check if we're running from a pipe
+if [ ! -t 0 ]; then
+    # We're running from a pipe, download and re-execute
+    TEMP_SCRIPT="/tmp/k8s-vps-proxy-setup-$$.sh"
+    cat > "$TEMP_SCRIPT"
+    chmod +x "$TEMP_SCRIPT"
+    exec sh "$TEMP_SCRIPT"
+    exit $?
+fi
+
 # Color definitions (POSIX compatible)
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -51,7 +61,7 @@ fi
 # Step 2: Get domain name
 echo ""
 printf "Enter your domain name (e.g., example.com): "
-read DOMAIN </dev/tty
+read DOMAIN
 if [ -z "$DOMAIN" ]; then
     log_error "Domain name is required"
 fi
@@ -94,7 +104,7 @@ log_info "Detecting VPS public IP..."
 VPS_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || curl -s ipecho.net/plain)
 if [ -z "$VPS_IP" ]; then
     printf "Could not detect public IP. Please enter VPS IP manually: "
-    read VPS_IP </dev/tty
+    read VPS_IP
 fi
 log_info "VPS IP: $VPS_IP"
 
