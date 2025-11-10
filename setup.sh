@@ -50,7 +50,8 @@ fi
 
 # Step 2: Get domain name
 echo ""
-read -p "Enter your domain name (e.g., example.com): " DOMAIN
+printf "Enter your domain name (e.g., example.com): "
+read DOMAIN
 if [ -z "$DOMAIN" ]; then
     log_error "Domain name is required"
 fi
@@ -92,7 +93,8 @@ log_success "WireGuard keys generated"
 log_info "Detecting VPS public IP..."
 VPS_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || curl -s ipecho.net/plain)
 if [ -z "$VPS_IP" ]; then
-    read -p "Could not detect public IP. Please enter VPS IP manually: " VPS_IP
+    printf "Could not detect public IP. Please enter VPS IP manually: "
+    read VPS_IP
 fi
 log_info "VPS IP: $VPS_IP"
 
