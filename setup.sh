@@ -40,19 +40,33 @@ WG_PORT="51820"
 
 # Step 1: Check and install Docker if needed
 log_info "Checking Docker installation..."
-if ! command -v docker >/dev/null 2>&1; then
-    log_warning "Docker not found. Installing Docker..."
-    curl -fsSL https://get.docker.com | sh
-    systemctl enable docker
-    systemctl start docker
-    log_success "Docker installed successfully"
+
+# Skip Docker check if already confirmed working
+if docker version >/dev/null 2>&1; then
+    log_success "Docker is installed and running"
 else
-    log_success "Docker is already installed"
-    # Verify Docker is running
-    if ! docker info >/dev/null 2>&1; then
-        log_warning "Docker is installed but not running. Starting Docker..."
-        systemctl start docker
+    log_warning "Docker not accessible. Checking installation..."
+
+    if [ -x "/usr/bin/docker" ] || [ -x "/usr/local/bin/docker" ] || which docker >/dev/null 2>&1; then
+        log_info "Docker binary found but not running"
+        systemctl start docker 2>/dev/null || service docker start 2>/dev/null
         sleep 2
+
+        if ! docker version >/dev/null 2>&1; then
+            log_error "Docker installed but cannot start. Please check Docker daemon"
+        fi
+    else
+        log_warning "Docker not found. Installing Docker..."
+        printf "${YELLOW}Install Docker now? (y/N): ${NC}"
+        read INSTALL_DOCKER
+        if [ "$INSTALL_DOCKER" = "y" ] || [ "$INSTALL_DOCKER" = "Y" ]; then
+            curl -fsSL https://get.docker.com | sh
+            systemctl enable docker
+            systemctl start docker
+            log_success "Docker installed successfully"
+        else
+            log_error "Docker is required. Please install Docker manually and run this script again"
+        fi
     fi
 fi
 
