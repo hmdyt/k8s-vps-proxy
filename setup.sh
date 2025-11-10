@@ -40,7 +40,7 @@ WG_PORT="51820"
 
 # Step 1: Check and install Docker if needed
 log_info "Checking Docker installation..."
-if ! command -v docker &> /dev/null; then
+if ! command -v docker >/dev/null 2>&1; then
     log_warning "Docker not found. Installing Docker..."
     curl -fsSL https://get.docker.com | sh
     systemctl enable docker
@@ -48,10 +48,16 @@ if ! command -v docker &> /dev/null; then
     log_success "Docker installed successfully"
 else
     log_success "Docker is already installed"
+    # Verify Docker is running
+    if ! docker info >/dev/null 2>&1; then
+        log_warning "Docker is installed but not running. Starting Docker..."
+        systemctl start docker
+        sleep 2
+    fi
 fi
 
 # Check Docker Compose
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
     log_warning "Docker Compose not found. Installing..."
     apt-get update
     apt-get install -y docker-compose-plugin || apt-get install -y docker-compose
