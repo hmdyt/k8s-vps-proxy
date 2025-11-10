@@ -86,27 +86,47 @@ mkdir -p $INSTALL_DIR
 cd $INSTALL_DIR
 
 # Check for existing installation
-if [ -f ".env" ]; then
+EXISTING_INSTALL=0
+if [ -f ".env" ] && [ -f "docker-compose.yml" ]; then
+    EXISTING_INSTALL=1
     log_info "Existing installation found at $INSTALL_DIR"
-    printf "${YELLOW}Do you want to update the existing installation? (y/N): ${NC}"
-    read UPDATE_CHOICE
-    if [ "$UPDATE_CHOICE" != "y" ] && [ "$UPDATE_CHOICE" != "Y" ]; then
-        log_info "Keeping existing configuration. Exiting."
-        exit 0
-    fi
-    # Load existing configuration
-    . ./.env
-    log_info "Loaded existing configuration for domain: $DOMAIN"
 
-    # Backup existing configs
-    BACKUP_DIR="backup-$(date +%Y%m%d-%H%M%S)"
-    log_info "Creating backup in $BACKUP_DIR"
-    mkdir -p $BACKUP_DIR
-    [ -f ".env" ] && cp .env $BACKUP_DIR/
-    [ -f "wireguard/wg0.conf" ] && cp wireguard/wg0.conf $BACKUP_DIR/
-    [ -f "caddy/Caddyfile" ] && cp caddy/Caddyfile $BACKUP_DIR/
-    [ -f "wireguard/privatekey" ] && cp wireguard/privatekey $BACKUP_DIR/
-    [ -f "wireguard/publickey" ] && cp wireguard/publickey $BACKUP_DIR/
+    # Try to load existing configuration
+    . ./.env
+
+    # Check if DOMAIN is set from existing config
+    if [ -n "$DOMAIN" ]; then
+        log_info "Loaded existing configuration for domain: $DOMAIN"
+        printf "${YELLOW}Do you want to update the existing installation? (y/N): ${NC}"
+        read UPDATE_CHOICE
+
+        if [ "$UPDATE_CHOICE" != "y" ] && [ "$UPDATE_CHOICE" != "Y" ]; then
+            log_info "Keeping existing configuration. Checking services..."
+            # Don't exit, just check if services are running
+            SERVICE_STATUS=$(docker compose ps 2>/dev/null || docker-compose ps 2>/dev/null)
+            if echo "$SERVICE_STATUS" | grep -q "Up"; then
+                log_success "Services are running. Setup complete!"
+                exit 0
+            else
+                log_info "Services not running. Starting services..."
+                docker compose up -d || docker-compose up -d
+                exit 0
+            fi
+        fi
+
+        # Backup existing configs
+        BACKUP_DIR="backup-$(date +%Y%m%d-%H%M%S)"
+        log_info "Creating backup in $BACKUP_DIR"
+        mkdir -p $BACKUP_DIR
+        [ -f ".env" ] && cp .env $BACKUP_DIR/
+        [ -f "wireguard/wg0.conf" ] && cp wireguard/wg0.conf $BACKUP_DIR/
+        [ -f "caddy/Caddyfile" ] && cp caddy/Caddyfile $BACKUP_DIR/
+        [ -f "wireguard/privatekey" ] && cp wireguard/privatekey $BACKUP_DIR/
+        [ -f "wireguard/publickey" ] && cp wireguard/publickey $BACKUP_DIR/
+    else
+        log_warning "Existing .env found but DOMAIN not set. Will ask for domain."
+        EXISTING_INSTALL=0
+    fi
 fi
 
 # Step 3: Get domain name from user (if not already set)
