@@ -10,8 +10,6 @@ VPSで以下のコマンドを実行するだけ：
 curl -sSL https://raw.githubusercontent.com/hmdyt/k8s-vps-proxy/main/setup.sh | bash
 ```
 
-**注意**: `bash`が必要です（`sh`では動作しません）
-
 ## 📋 What it does
 
 1. **WireGuardトンネル構築** - VPSとK8sクラスター間の安全な通信路
