@@ -60,11 +60,13 @@ else
     log_success "Docker already installed"
 fi
 
-# Step 2: Get domain name
-echo ""
-read -p "Enter your domain name (e.g., example.com): " DOMAIN
-if [ -z "$DOMAIN" ]; then
-    log_error "Domain name is required"
+# Step 2: Get domain name from environment variable
+if [ -z "$DOMAIN" ] || [ "$DOMAIN" = "" ]; then
+    log_error "Domain name is required. Set DOMAIN environment variable: DOMAIN=example.com curl ... | bash"
+fi
+# Additional validation for empty string
+if [ ${#DOMAIN} -eq 0 ]; then
+    log_error "Domain cannot be empty string"
 fi
 log_info "Using domain: $DOMAIN"
 
@@ -100,11 +102,13 @@ chmod 600 wireguard/privatekey
 
 log_success "WireGuard keys generated"
 
-# Step 6: Get VPS public IP
-log_info "Detecting VPS public IP..."
-VPS_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || curl -s ipecho.net/plain)
+# Step 6: Get VPS public IP (from env or auto-detect)
 if [ -z "$VPS_IP" ]; then
-    read -p "Could not detect public IP. Please enter VPS IP manually: " VPS_IP
+    log_info "Detecting VPS public IP..."
+    VPS_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || curl -s ipecho.net/plain)
+    if [ -z "$VPS_IP" ]; then
+        log_error "Could not detect public IP. Set VPS_IP environment variable: VPS_IP=x.x.x.x DOMAIN=... curl ... | bash"
+    fi
 fi
 log_info "VPS IP: $VPS_IP"
 

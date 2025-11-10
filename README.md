@@ -7,8 +7,12 @@ VPSにWireGuardトンネルとCaddyリバースプロキシを自動構築し、
 VPSで以下のコマンドを実行するだけ：
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/hmdyt/k8s-vps-proxy/main/setup.sh | bash
+DOMAIN=example.com curl -sSL https://raw.githubusercontent.com/hmdyt/k8s-vps-proxy/main/setup.sh | bash
 ```
+
+環境変数で設定可能：
+- `DOMAIN` (必須): あなたのドメイン名
+- `VPS_IP` (オプション): VPSのIPアドレス（自動検出されない場合に指定）
 
 ## 📋 What it does
 
