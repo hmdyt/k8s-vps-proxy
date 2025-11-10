@@ -51,7 +51,7 @@ fi
 # Step 2: Get domain name
 echo ""
 printf "Enter your domain name (e.g., example.com): "
-read DOMAIN
+read DOMAIN </dev/tty
 if [ -z "$DOMAIN" ]; then
     log_error "Domain name is required"
 fi
@@ -94,7 +94,7 @@ log_info "Detecting VPS public IP..."
 VPS_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || curl -s ipecho.net/plain)
 if [ -z "$VPS_IP" ]; then
     printf "Could not detect public IP. Please enter VPS IP manually: "
-    read VPS_IP
+    read VPS_IP </dev/tty
 fi
 log_info "VPS IP: $VPS_IP"
 
