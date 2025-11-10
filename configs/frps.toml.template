@@ -1,0 +1,23 @@
+# frps configuration file
+
+bindPort = 7000
+vhostHTTPPort = 80
+vhostHTTPSPort = 443
+
+# Authentication
+auth.method = "token"
+auth.token = "${FRP_TOKEN}"
+
+# Web server for dashboard (optional)
+webServer.addr = "0.0.0.0"
+webServer.port = 7500
+webServer.user = "admin"
+webServer.password = "${FRP_TOKEN}"
+
+# Logging
+log.to = "/var/log/frp/frps.log"
+log.level = "info"
+log.maxDays = 3
+
+# Domain for vhost
+subdomainHost = "${DOMAIN}"

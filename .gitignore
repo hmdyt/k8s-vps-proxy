@@ -1,21 +1,14 @@
 # Environment files
 .env
 
-# WireGuard keys and configs (NEVER commit these!)
-wireguard/
-*.key
-*.conf
+# frp configs (generated)
+*.toml
 !configs/*.template
-!configs/wg0.conf.template
-
-# Caddy data
-caddy_data/
-caddy_config/
-caddy/Caddyfile
-!configs/Caddyfile.template
 
 # Setup information
 setup-info.txt
+frpc.toml
+k8s-*.toml
 
 # IDE files
 .vscode/
@@ -34,9 +27,6 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
-
-# Docker volumes
-volumes/
 
 # Temporary files
 *.tmp
