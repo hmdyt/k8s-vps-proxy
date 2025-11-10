@@ -53,7 +53,7 @@ done
 log_success "Ports 80 and 443 are now available"
 
 # Variables
-FRP_VERSION="0.65.0"
+FRP_VERSION="0.64.0"
 INSTALL_DIR="/etc/frp"
 LOG_DIR="/var/log/frp"
 
