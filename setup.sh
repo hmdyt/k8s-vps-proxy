@@ -124,9 +124,6 @@ webServer.password = "$TOKEN"
 log.to = "$LOG_DIR/frps.log"
 log.level = "info"
 log.maxDays = 3
-
-# Domain for vhost
-subdomainHost = "$DOMAIN"
 EOF
 
 log_success "Configuration created at $INSTALL_DIR/frps.toml"
